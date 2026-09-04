@@ -5,7 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".treqs" / "workflows" / "tinyzero-canary.yaml"
 PACKAGER = ROOT / ".treqs" / "scripts" / "package_tinyzero_canary.py"
-DATASET_REVISION = "408f70d177020686d34a56bba5952feb45aaaee4"
+PREPROCESSOR = ROOT / "examples" / "data_preprocess" / "countdown.py"
 MODEL_REVISION = "060db6499f32faf8b98477b0a26969ef7d8b9987"
 
 
@@ -21,7 +21,7 @@ class TinyZeroCanaryContractTests(unittest.TestCase):
         self.assertIn("'transformers==4.46.0'", workflow)
         self.assertIn(f"--revision {MODEL_REVISION}", workflow)
         self.assertIn("actor_rollout_ref.model.path=models/Qwen2.5-0.5B", workflow)
-        self.assertIn(f"--dataset_revision {DATASET_REVISION}", workflow)
+        self.assertIn("--canary_fixture", workflow)
         self.assertIn("algorithm.adv_estimator=grpo", workflow)
         self.assertIn("trainer.n_gpus_per_node=1", workflow)
         self.assertIn("trainer.total_training_steps=1", workflow)
@@ -32,11 +32,13 @@ class TinyZeroCanaryContractTests(unittest.TestCase):
         self.assertIn("--private --yes --no-tag", workflow)
 
     def test_dataset_preparation_pins_the_hugging_face_revision(self):
-        source = (ROOT / "examples" / "data_preprocess" / "countdown.py").read_text()
+        source = PREPROCESSOR.read_text()
 
         self.assertIn("--dataset_revision", source)
         self.assertIn("revision=args.dataset_revision", source)
         self.assertIn("os.makedirs(local_dir, exist_ok=True)", source)
+        self.assertIn("--canary_fixture", source)
+        self.assertIn("build_canary_fixture", source)
 
     def test_packager_emits_harness_receipts_and_load_verifies_safetensors(self):
         source = PACKAGER.read_text()

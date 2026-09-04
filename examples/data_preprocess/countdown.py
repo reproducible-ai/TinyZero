@@ -50,6 +50,31 @@ def gen_dataset(
     
     return samples
 
+
+def build_canary_fixture():
+    """Return 16 deterministic, solvable three-number countdown examples."""
+    examples = [
+        (6, [1, 2, 3]),
+        (20, [2, 3, 4]),
+        (54, [4, 5, 6]),
+        (70, [2, 5, 10]),
+        (80, [3, 7, 8]),
+        (72, [2, 6, 9]),
+        (35, [3, 4, 5]),
+        (99, [4, 7, 9]),
+        (40, [1, 4, 8]),
+        (72, [2, 7, 8]),
+        (63, [3, 6, 7]),
+        (72, [4, 5, 8]),
+        (77, [5, 6, 7]),
+        (90, [2, 8, 9]),
+        (63, [1, 6, 9]),
+        (80, [3, 5, 10]),
+    ]
+    return Dataset.from_list(
+        [{"target": target, "nums": numbers} for target, numbers in examples]
+    )
+
 def make_prefix(dp, template_type):
     target = dp['target']
     numbers = dp['nums']
@@ -79,6 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_size', type=int, default=1024)
     parser.add_argument('--template_type', type=str, default='base')
     parser.add_argument('--dataset_revision', type=str, default=None)
+    parser.add_argument('--canary_fixture', action='store_true')
 
     args = parser.parse_args()
 
@@ -86,13 +112,16 @@ if __name__ == '__main__':
     TRAIN_SIZE = args.train_size
     TEST_SIZE = args.test_size
 
-    raw_dataset = load_dataset(
-        'Jiayi-Pan/Countdown-Tasks-3to4',
-        split='train',
-        revision=args.dataset_revision,
-    )
+    if args.canary_fixture:
+        raw_dataset = build_canary_fixture()
+    else:
+        raw_dataset = load_dataset(
+            'Jiayi-Pan/Countdown-Tasks-3to4',
+            split='train',
+            revision=args.dataset_revision,
+        )
 
-    assert len(raw_dataset) > TRAIN_SIZE + TEST_SIZE
+    assert len(raw_dataset) >= TRAIN_SIZE + TEST_SIZE
     train_dataset = raw_dataset.select(range(TRAIN_SIZE))
     test_dataset = raw_dataset.select(range(TRAIN_SIZE, TRAIN_SIZE + TEST_SIZE))
 

@@ -45,10 +45,10 @@ prepare_data:
       timeout --signal=TERM --kill-after=30 900 hf download Qwen/Qwen2.5-0.5B \
       --revision 060db6499f32faf8b98477b0a26969ef7d8b9987 \
       --local-dir models/Qwen2.5-0.5B
-    roar run -n prepare_data -- env PYTHONUNBUFFERED=1 HF_HOME=/tmp/tinyzero-hf \
+    roar run -n prepare_data -- env PYTHONUNBUFFERED=1 \
       timeout --signal=TERM --kill-after=30 900 python examples/data_preprocess/countdown.py \
       --local_dir data/countdown-canary --train_size 8 --test_size 8 \
-      --dataset_revision 408f70d177020686d34a56bba5952feb45aaaee4
+      --canary_fixture
   trace: "off"
 
 train:
