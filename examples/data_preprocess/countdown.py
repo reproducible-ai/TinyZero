@@ -78,6 +78,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_size', type=int, default=327680)
     parser.add_argument('--test_size', type=int, default=1024)
     parser.add_argument('--template_type', type=str, default='base')
+    parser.add_argument('--dataset_revision', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -85,7 +86,11 @@ if __name__ == '__main__':
     TRAIN_SIZE = args.train_size
     TEST_SIZE = args.test_size
 
-    raw_dataset = load_dataset('Jiayi-Pan/Countdown-Tasks-3to4', split='train')
+    raw_dataset = load_dataset(
+        'Jiayi-Pan/Countdown-Tasks-3to4',
+        split='train',
+        revision=args.dataset_revision,
+    )
 
     assert len(raw_dataset) > TRAIN_SIZE + TEST_SIZE
     train_dataset = raw_dataset.select(range(TRAIN_SIZE))
@@ -123,6 +128,7 @@ if __name__ == '__main__':
     local_dir = args.local_dir
     hdfs_dir = args.hdfs_dir
 
+    os.makedirs(local_dir, exist_ok=True)
     train_dataset.to_parquet(os.path.join(local_dir, 'train.parquet'))
     test_dataset.to_parquet(os.path.join(local_dir, 'test.parquet'))
 

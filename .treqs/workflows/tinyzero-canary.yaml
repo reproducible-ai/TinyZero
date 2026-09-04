@@ -1,0 +1,104 @@
+name: TinyZero one-step Qwen2.5-0.5B canary
+
+secrets:
+  - HF_TOKEN
+
+setup:
+  command: |
+    set -euo pipefail
+    export PATH="$(python3 -m site --user-base)/bin:${PATH}"
+    GPU_COUNT="$(nvidia-smi --list-gpus | wc -l | tr -d ' ')"
+    test "${GPU_COUNT}" -ge 1
+    timeout --signal=TERM --kill-after=30 180 python3 -m pip install --user --disable-pip-version-check uv==0.12.3
+    command -v uv >/dev/null
+    rm -rf .venv
+    timeout --signal=TERM --kill-after=30 180 uv venv --python 3.11 .venv
+    timeout --signal=TERM --kill-after=30 1200 uv pip install --python .venv/bin/python \
+      --index-url https://download.pytorch.org/whl/cu121 torch==2.4.0
+    timeout --signal=TERM --kill-after=30 1800 uv pip install --python .venv/bin/python \
+      accelerate codetiming 'datasets==3.2.0' dill 'huggingface-hub==0.36.0' \
+      'hydra-core==1.3.2' 'numpy<2' \
+      ninja packaging pandas pybind11 'ray==2.10.0' 'safetensors==0.4.5' setuptools \
+      'tensordict==0.5.0' wheel \
+      'transformers==4.46.0' 'vllm==0.6.3' wandb
+    timeout --signal=TERM --kill-after=30 1800 env MAX_JOBS=1 \
+      uv pip install --python .venv/bin/python flash-attn==2.7.0.post2 --no-build-isolation
+    timeout --signal=TERM --kill-after=30 180 uv pip install --python .venv/bin/python --no-deps -e .
+    timeout --signal=TERM --kill-after=30 300 uv tool install --python 3.11 --force --with 'huggingface-hub==0.36.0' roar-cli==0.4.5
+    if command -v sudo >/dev/null 2>&1; then
+      sudo -n ln -sf "$(command -v roar)" /usr/local/bin/roar
+    else
+      ln -sf "$(command -v roar)" /usr/local/bin/roar
+    fi
+    test "$(env PATH=/usr/local/bin:/usr/bin:/bin roar --version)" = "roar, version 0.4.5"
+    roar tracer use preload
+    roar tracer
+    roar init --no-gitignore
+    .venv/bin/python -m unittest tests.treqs.test_tinyzero_canary_contract -v
+  trace: "off"
+
+prepare_data:
+  command: |
+    set -euo pipefail
+    export PATH="$PWD/.venv/bin:/usr/local/bin:$PATH"
+    roar run -n fetch_model -- env HF_HOME=/tmp/tinyzero-hf \
+      timeout --signal=TERM --kill-after=30 900 hf download Qwen/Qwen2.5-0.5B \
+      --revision 060db6499f32faf8b98477b0a26969ef7d8b9987 \
+      --local-dir models/Qwen2.5-0.5B
+    roar run -n prepare_data -- env PYTHONUNBUFFERED=1 HF_HOME=/tmp/tinyzero-hf \
+      timeout --signal=TERM --kill-after=30 900 python examples/data_preprocess/countdown.py \
+      --local_dir data/countdown-canary --train_size 8 --test_size 8 \
+      --dataset_revision 408f70d177020686d34a56bba5952feb45aaaee4
+  trace: "off"
+
+train:
+  command: |
+    set -euo pipefail
+    export PATH="$PWD/.venv/bin:/usr/local/bin:$PATH"
+    roar run -n train -- env PYTHONUNBUFFERED=1 HF_HOME=/tmp/tinyzero-hf \
+      WANDB_MODE=disabled VLLM_ATTENTION_BACKEND=XFORMERS \
+      timeout --signal=TERM --kill-after=30 1800 python -m verl.trainer.main_ppo \
+      algorithm.adv_estimator=grpo \
+      data.train_files=data/countdown-canary/train.parquet \
+      data.val_files=data/countdown-canary/test.parquet \
+      data.train_batch_size=8 data.val_batch_size=8 \
+      data.max_prompt_length=256 data.max_response_length=256 \
+      actor_rollout_ref.model.path=models/Qwen2.5-0.5B \
+      actor_rollout_ref.model.use_remove_padding=False \
+      actor_rollout_ref.model.enable_gradient_checkpointing=True \
+      actor_rollout_ref.actor.optim.lr=1e-6 \
+      actor_rollout_ref.actor.ppo_mini_batch_size=8 \
+      actor_rollout_ref.actor.ppo_micro_batch_size=1 \
+      actor_rollout_ref.actor.use_kl_loss=True \
+      actor_rollout_ref.actor.kl_loss_coef=0.001 \
+      actor_rollout_ref.actor.fsdp_config.param_offload=True \
+      actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
+      actor_rollout_ref.rollout.log_prob_micro_batch_size=1 \
+      actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+      actor_rollout_ref.rollout.gpu_memory_utilization=0.25 \
+      actor_rollout_ref.rollout.n=2 \
+      actor_rollout_ref.ref.log_prob_micro_batch_size=1 \
+      actor_rollout_ref.ref.fsdp_config.param_offload=True \
+      trainer.logger=['console'] +trainer.val_before_train=False \
+      trainer.default_hdfs_dir=null \
+      trainer.default_local_dir=checkpoints/TinyZero/treqs-tinyzero-canary \
+      trainer.n_gpus_per_node=1 trainer.nnodes=1 \
+      trainer.save_freq=1 trainer.test_freq=-1 \
+      trainer.project_name=TinyZero trainer.experiment_name=treqs-tinyzero-canary \
+      trainer.total_epochs=1 trainer.total_training_steps=1
+  trace: "off"
+
+package:
+  command: |
+    set -euo pipefail
+    export PATH="$PWD/.venv/bin:/usr/local/bin:$PATH"
+    roar run -n package -- env PYTHONUNBUFFERED=1 \
+      timeout --signal=TERM --kill-after=30 600 python .treqs/scripts/package_tinyzero_canary.py
+  trace: "off"
+
+publish:
+  glaas_creds: true
+  command: |
+    set -euo pipefail
+    roar put artifacts/tinyzero-canary/model.safetensors artifacts/tinyzero-canary/artifact-manifest.json artifacts/tinyzero-canary/result.json hf://reproducible-ai/harness-test-tinyzero-issue-4/artifacts/tinyzero-canary --private --yes --no-tag -m "TinyZero one-step Qwen2.5-0.5B canary"
+  trace: "off"

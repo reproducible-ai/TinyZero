@@ -1,0 +1,52 @@
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / ".treqs" / "workflows" / "tinyzero-canary.yaml"
+PACKAGER = ROOT / ".treqs" / "scripts" / "package_tinyzero_canary.py"
+DATASET_REVISION = "408f70d177020686d34a56bba5952feb45aaaee4"
+MODEL_REVISION = "060db6499f32faf8b98477b0a26969ef7d8b9987"
+
+
+class TinyZeroCanaryContractTests(unittest.TestCase):
+    def test_workflow_is_a_single_optimizer_step_l40s_canary(self):
+        workflow = WORKFLOW.read_text()
+
+        self.assertIn("Qwen/Qwen2.5-0.5B", workflow)
+        self.assertIn("flash-attn==2.7.0.post2", workflow)
+        self.assertIn("setuptools", workflow)
+        self.assertIn("wheel", workflow)
+        self.assertIn("'ray==2.10.0'", workflow)
+        self.assertIn("'transformers==4.46.0'", workflow)
+        self.assertIn(f"--revision {MODEL_REVISION}", workflow)
+        self.assertIn("actor_rollout_ref.model.path=models/Qwen2.5-0.5B", workflow)
+        self.assertIn(f"--dataset_revision {DATASET_REVISION}", workflow)
+        self.assertIn("algorithm.adv_estimator=grpo", workflow)
+        self.assertIn("trainer.n_gpus_per_node=1", workflow)
+        self.assertIn("trainer.total_training_steps=1", workflow)
+        self.assertIn("trainer.save_freq=1", workflow)
+        self.assertIn("WANDB_MODE=disabled", workflow)
+        self.assertIn("roar run -n train", workflow)
+        self.assertIn("roar put artifacts/tinyzero-canary/model.safetensors", workflow)
+        self.assertIn("--private --yes --no-tag", workflow)
+
+    def test_dataset_preparation_pins_the_hugging_face_revision(self):
+        source = (ROOT / "examples" / "data_preprocess" / "countdown.py").read_text()
+
+        self.assertIn("--dataset_revision", source)
+        self.assertIn("revision=args.dataset_revision", source)
+        self.assertIn("os.makedirs(local_dir, exist_ok=True)", source)
+
+    def test_packager_emits_harness_receipts_and_load_verifies_safetensors(self):
+        source = PACKAGER.read_text()
+
+        self.assertIn('"reproai.artifact/v1"', source)
+        self.assertIn('"optimizerSteps": 1', source)
+        self.assertIn("safe_open", source)
+        self.assertIn('print("E2E_ARTIFACT="', source)
+        self.assertIn('print("E2E_RESULT="', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
