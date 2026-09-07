@@ -3,6 +3,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+GITIGNORE = ROOT / ".gitignore"
 WORKFLOW = ROOT / ".treqs" / "workflows" / "tinyzero-canary.yaml"
 PACKAGER = ROOT / ".treqs" / "scripts" / "package_tinyzero_canary.py"
 PREPROCESSOR = ROOT / "examples" / "data_preprocess" / "countdown.py"
@@ -10,6 +11,11 @@ MODEL_REVISION = "060db6499f32faf8b98477b0a26969ef7d8b9987"
 
 
 class TinyZeroCanaryContractTests(unittest.TestCase):
+    def test_roar_runtime_state_cannot_dirty_the_training_checkout(self):
+        gitignore = GITIGNORE.read_text().splitlines()
+
+        self.assertIn(".roar/", gitignore)
+
     def test_workflow_is_a_single_optimizer_step_l40s_canary(self):
         workflow = WORKFLOW.read_text()
 
@@ -23,6 +29,10 @@ class TinyZeroCanaryContractTests(unittest.TestCase):
         self.assertIn("actor_rollout_ref.model.path=models/Qwen2.5-0.5B", workflow)
         self.assertIn("--canary_fixture", workflow)
         self.assertIn("algorithm.adv_estimator=grpo", workflow)
+        self.assertIn("data.train_batch_size=8", workflow)
+        self.assertIn("actor_rollout_ref.rollout.n=2", workflow)
+        # Eight prompts times two rollouts form one 16-sample actor mini-batch.
+        self.assertIn("actor_rollout_ref.actor.ppo_mini_batch_size=16", workflow)
         self.assertIn("trainer.n_gpus_per_node=1", workflow)
         self.assertIn("trainer.total_training_steps=1", workflow)
         self.assertIn("trainer.save_freq=1", workflow)
