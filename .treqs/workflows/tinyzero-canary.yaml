@@ -100,5 +100,5 @@ publish:
   glaas_creds: true
   command: |
     set -euo pipefail
-    roar put artifacts/tinyzero-canary/model.safetensors artifacts/tinyzero-canary/artifact-manifest.json artifacts/tinyzero-canary/result.json hf://reproducible-ai/harness-test-tinyzero-issue-4/artifacts/tinyzero-canary --private --yes --no-tag -m "TinyZero one-step Qwen2.5-0.5B canary"
+    roar put artifacts/tinyzero-canary/model.safetensors artifacts/tinyzero-canary/artifact-manifest.json artifacts/tinyzero-canary/result.json hf://reproducible-ai/harness-test-tinyzero-qwen2-5-0-5b-one-step-canary-partial-8e1291b6-4157-48bc-b3ae/artifacts/tinyzero-canary --private --yes --no-tag -m "TinyZero one-step Qwen2.5-0.5B canary"
   trace: "off"
