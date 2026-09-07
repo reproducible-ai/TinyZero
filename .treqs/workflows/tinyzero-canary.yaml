@@ -34,6 +34,9 @@ setup:
     roar tracer use preload
     roar tracer
     roar init --no-gitignore
+    # This canary starts Ray locally. Keep outer preload capture, but do not inject
+    # ROAR's distributed worker bootstrap into the local Ray runtime.
+    roar config set ray.enabled false
     .venv/bin/python -m unittest tests.treqs.test_tinyzero_canary_contract -v
   trace: "off"
 

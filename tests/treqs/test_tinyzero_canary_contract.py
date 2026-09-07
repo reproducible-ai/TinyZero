@@ -39,6 +39,7 @@ class TinyZeroCanaryContractTests(unittest.TestCase):
         self.assertIn("trainer.total_training_steps=1", workflow)
         self.assertIn("trainer.save_freq=1", workflow)
         self.assertIn("WANDB_MODE=disabled", workflow)
+        self.assertIn("roar config set ray.enabled false", workflow)
         self.assertIn("roar run -n train", workflow)
         self.assertIn("roar put artifacts/tinyzero-canary/model.safetensors", workflow)
         self.assertIn("--private --yes --no-tag", workflow)
