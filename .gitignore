@@ -9,6 +9,8 @@
 **/wandb
 .roar/
 .treqs/config.toml
+models/
+data/countdown-canary/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

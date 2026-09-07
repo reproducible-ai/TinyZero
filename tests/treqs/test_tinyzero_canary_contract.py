@@ -15,6 +15,8 @@ class TinyZeroCanaryContractTests(unittest.TestCase):
         gitignore = GITIGNORE.read_text().splitlines()
 
         self.assertIn(".roar/", gitignore)
+        self.assertIn("models/", gitignore)
+        self.assertIn("data/countdown-canary/", gitignore)
 
     def test_workflow_is_a_single_optimizer_step_l40s_canary(self):
         workflow = WORKFLOW.read_text()
